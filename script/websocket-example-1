@@ -1,0 +1,164 @@
+#!/usr/bin/perl
+
+# Copyright (c) 2010, David Davis - http://xant.us/
+
+# WebSocket Example 1
+# Powered by Mojo - http://mojolicious.org/ - http://github.com/kraih/mojo
+# and web-socket-js - http://github.com/gimite/web-socket-js
+
+use FindBin;
+use lib "$FindBin::Bin/../mojo/lib";
+
+use Mojolicious::Lite;
+use Mojo::Server::Daemon;
+
+@ARGV = qw( daemon ) unless @ARGV;
+
+die "This needs to be run as root, since the flash socket policy server listens on port 843." unless ( $> == 0 && $< == 0 );
+
+app->home(Mojo::Home->new("$FindBin::Bin/../"));
+
+get '/' => sub {
+    my $self = shift;
+    my $tx = $self->tx;
+
+    # WebSocket request
+    if ( $tx->is_websocket ) {
+        $tx->send_message( 'Congratulations, your Mojo is working!' );
+        
+        return $tx->receive_message(
+            sub {
+                my ( $tx, $message ) = @_;
+                $tx->send_message( "echo: $message" );
+            }
+        );
+    }
+
+    $self->render( 'index' );
+};
+
+# flash policy socket server
+Mojo::Server::Daemon->new->ioloop->listen(
+    port => 843,
+    cb   => sub {
+        my ( $self, $id ) = @_;
+        warn "843 connect: $id\n";
+
+        my $timer = $self->timer( after => 5, sub {
+            $self->drop( $id );
+        });
+
+        my @out;
+
+        # Incoming data
+        $self->read_cb( $id => sub {
+            my ( $self, $id, $chunk ) = @_;
+            warn "843 read $chunk\n";
+
+            if ( $chunk && $chunk =~ m/^<policy-file-request\/>\0?$/ ) {
+                warn "843: got policy request\n";
+                push( @out, qq|<?xml version="1.0"?>
+<!DOCTYPE cross-domain-policy SYSTEM "/xml/dtds/cross-domain-policy.dtd">
+<cross-domain-policy>
+<site-control permitted-cross-domain-policies="master-only"/>
+<allow-access-from domain="*" to-ports="*" secure="false"/>
+</cross-domain-policy>
+| );
+                # Got some data, time to write
+                $self->writing( $id );
+            } else {
+                warn "843: got junk, dropping connection\n";
+                $self->drop( $id );
+                $self->drop( $timer ) if $timer;
+            }
+
+        });
+
+        # Ready to write
+        $self->write_cb( $id => sub {
+            my ( $self, $id ) = @_;
+            my $o = shift @out;
+            #warn "843 write $o\n" if $o;
+
+            unless ( $o ) {
+                $self->finish( $id );
+                $self->drop( $timer ) if $timer;
+            }
+            return $o;
+        });
+    }
+);
+
+app->start;
+
+1;
+
+__DATA__
+
+@@ index.html.ep
+% my $url = $self->req->url->to_abs->scheme( 'ws' )->path( '/' );
+<!doctype html>
+<html>
+<head>
+    <title>Mojo Websocket Demo</title>
+    <script type="text/javascript" src="swfobject.js"></script>
+    <script type="text/javascript" src="FABridge.js"></script>
+    <script type="text/javascript" src="web_socket.js"></script>
+    <script type="text/javascript">
+
+        // Set URL of your WebSocketMain.swf here:
+        WebSocket.__swfLocation = 'WebSocketMain.swf';
+
+        var ws, input, log;
+
+        function init() {
+            input = document.getElementById( 'input' );
+            log = document.getElementById( 'log' );
+
+            // Connect to Web Socket.
+            ws = new WebSocket( '<%= $url %>' );
+
+            // Set event handlers.
+            ws.onopen = function() {
+                output( 'onopen' );
+                ws.send( 'test' );
+            };
+            ws.onmessage = function(e) {
+                // e.data contains received string.
+                output( 'onmessage: ' + e.data );
+            };
+            ws.onclose = function() {
+                output( 'onclose' );
+            };
+        }
+
+        function onSubmit() {
+            ws.send( input.value );
+            output( 'send: ' + input.value );
+            input.value = '';
+            try{ input.focus(); } catch(e) { };
+        }
+
+        function onCloseClick() {
+            ws.close();
+        }
+
+        function output(str) {
+            var escaped = str.replace( /&/, '&amp;' ).replace( /</, '&lt;' ).
+                replace( />/, '&gt;' ).replace( /"/, '&quot;' );
+            log.innerHTML = escaped + '<br>' + log.innerHTML;
+        }
+
+        window.onload = init;
+    </script>
+</head>
+<body>
+  <form onsubmit="onSubmit(); return false;">
+    <input type="text" id="input">
+    <input type="submit" value="Send">
+    <button onclick="onCloseClick(); return false;">disconnect</button>
+  </form>
+  <div id="log"></div>
+</body>
+</html>
+
