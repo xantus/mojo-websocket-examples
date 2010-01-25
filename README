@@ -4,3 +4,8 @@ In this repo you will find various examples using WebSockets and Mojolicious
 http://mojolicious.org/
 http://websockets.org/
 
+To check out the code using git:
+
+git clone git://github.com/xantus/mojo-websocket-examples.git
+cd mojo-websocket-examples
+git submodule --init update
