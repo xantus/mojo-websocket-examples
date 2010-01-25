@@ -8,4 +8,4 @@ To check out the code using git:
 
 git clone git://github.com/xantus/mojo-websocket-examples.git
 cd mojo-websocket-examples
-git submodule --init update
+git submodule update --init
