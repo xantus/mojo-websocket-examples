@@ -16,8 +16,6 @@ use Mojo::Server::Daemon;
 
 die "This needs to be run as root, since the flash socket policy server listens on port 843." unless ( $> == 0 && $< == 0 );
 
-app->home(Mojo::Home->new("$FindBin::Bin/../"));
-
 get '/' => sub {
     my $self = shift;
     my $tx = $self->tx;
