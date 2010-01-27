@@ -39,7 +39,7 @@ $server->ioloop->listen(
 <site-control permitted-cross-domain-policies="master-only"/>
 <allow-access-from domain="*" to-ports="*" secure="false"/>
 </cross-domain-policy>
-|;
+\0|;
         });
     }
 );
