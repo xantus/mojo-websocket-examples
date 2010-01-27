@@ -42,47 +42,31 @@ Mojo::Server::Daemon->new->ioloop->listen(
         my ( $self, $id ) = @_;
         warn "843 connect: $id\n";
 
-        my $timer = $self->timer( after => 5, sub {
+        $self->timer( $id => ( after => 5, sub {
             $self->drop( $id );
-        });
-
-        my @out;
+        } ));
 
         # Incoming data
         $self->read_cb( $id => sub {
             my ( $self, $id, $chunk ) = @_;
-            warn "843 read $chunk\n";
-
-            if ( $chunk && $chunk =~ m/^<policy-file-request\/>\0?$/ ) {
+            if ( $chunk ) {
                 warn "843: got policy request\n";
-                push( @out, qq|<?xml version="1.0"?>
-<!DOCTYPE cross-domain-policy SYSTEM "/xml/dtds/cross-domain-policy.dtd">
-<cross-domain-policy>
-<site-control permitted-cross-domain-policies="master-only"/>
-<allow-access-from domain="*" to-ports="*" secure="false"/>
-</cross-domain-policy>
-| );
                 # Got some data, time to write
                 $self->writing( $id );
-            } else {
-                warn "843: got junk, dropping connection\n";
-                $self->drop( $id );
-                $self->drop( $timer ) if $timer;
             }
-
         });
 
         # Ready to write
         $self->write_cb( $id => sub {
             my ( $self, $id ) = @_;
-            my $o = shift @out;
-            #warn "843 write $o\n" if $o;
-
-            unless ( $o ) {
-                $self->finish( $id );
-                $self->drop( $timer ) if $timer;
-            }
-            return $o;
+            $self->finish( $id );
+            return qq|<?xml version="1.0"?>
+<!DOCTYPE cross-domain-policy SYSTEM "/xml/dtds/cross-domain-policy.dtd">
+<cross-domain-policy>
+<site-control permitted-cross-domain-policies="master-only"/>
+<allow-access-from domain="*" to-ports="*" secure="false"/>
+</cross-domain-policy>
+|;
         });
     }
 );
