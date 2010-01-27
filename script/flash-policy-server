@@ -1,0 +1,84 @@
+#!/usr/bin/perl
+
+use FindBin;
+use lib "$FindBin::Bin/../mojo/lib";
+
+use strict;
+use warnings;
+
+die "This needs to be run as root, since the flash socket policy server listens on port 843." unless ( $> == 0 && $< == 0 );
+
+# flash policy socket server
+my $server = Custom::Daemon->new;
+
+$server->ioloop->listen(
+    port => 843,
+    cb   => sub {
+        my ( $self, $id ) = @_;
+
+        $self->timer( $id => ( after => 5, cb => sub {
+            $self->drop( $id );
+        }));
+
+        # Incoming data
+        $self->read_cb( $id => sub {
+            my ( $self, $id, $chunk ) = @_;
+            if ( $chunk ) {
+                warn "843: got policy request\n";
+                # Got some data, time to write
+                $self->writing( $id );
+            }
+        });
+
+        # Ready to write
+        $self->write_cb( $id => sub {
+            shift->finish( shift );
+            return qq|<?xml version="1.0"?>
+<!DOCTYPE cross-domain-policy SYSTEM "/xml/dtds/cross-domain-policy.dtd">
+<cross-domain-policy>
+<site-control permitted-cross-domain-policies="master-only"/>
+<allow-access-from domain="*" to-ports="*" secure="false"/>
+</cross-domain-policy>
+|;
+        });
+    }
+);
+
+$server->lock_file('/tmp/mojo_flash_policy.lock');
+$server->pid_file('/tmp/mojo_flash_policy.pid');
+
+
+$server->run;
+
+package Custom::Daemon;
+
+use strict;
+use warnings;
+
+use base 'Mojo::Server::Daemon';
+
+sub new {
+    my $class = shift;
+    $class->SUPER::new(@_);
+}
+
+sub prepare_ioloop {
+    my $self = shift;
+
+    # Lock callback
+    $self->ioloop->lock_cb(sub { $self->accept_lock($_[1]) });
+
+    # Unlock callback
+    $self->ioloop->unlock_cb(sub { $self->accept_unlock });
+
+    # Stop ioloop on HUP signal
+    $SIG{HUP} = sub { $self->ioloop->stop };
+
+    # Max clients
+    $self->ioloop->max_connections($self->max_clients);
+    
+    print "Flash Socket Policy Server available on port 843.\n";
+}
+
+1;
+
