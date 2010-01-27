@@ -14,62 +14,21 @@ use Mojo::Server::Daemon;
 
 @ARGV = qw( daemon ) unless @ARGV;
 
-die "This needs to be run as root, since the flash socket policy server listens on port 843." unless ( $> == 0 && $< == 0 );
-
-get '/' => sub {
+websocket '/' => sub {
     my $self = shift;
-    my $tx = $self->tx;
-
-    # WebSocket request
-    if ( $tx->is_websocket ) {
-        $tx->send_message( 'Congratulations, your Mojo is working!' );
-        
-        return $tx->receive_message(
-            sub {
-                my ( $tx, $message ) = @_;
-                $tx->send_message( "echo: $message" );
-            }
-        );
-    }
-
-    $self->render( 'index' );
+    $self->send_message( 'Congratulations, your Mojo is working!' );
+    $self->receive_message(
+        sub {
+            my ( $self, $message ) = @_;
+            $self->send_message( 'echo:'.$message );
+        }
+    );
 };
 
-# flash policy socket server
-Mojo::Server::Daemon->new->ioloop->listen(
-    port => 843,
-    cb   => sub {
-        my ( $self, $id ) = @_;
-        warn "843 connect: $id\n";
+get '/' => 'index';
 
-        $self->timer( $id => ( after => 5, cb => sub {
-            $self->drop( $id );
-        } ));
-
-        # Incoming data
-        $self->read_cb( $id => sub {
-            my ( $self, $id, $chunk ) = @_;
-            if ( $chunk ) {
-                warn "843: got policy request\n";
-                # Got some data, time to write
-                $self->writing( $id );
-            }
-        });
-
-        # Ready to write
-        $self->write_cb( $id => sub {
-            my ( $self, $id ) = @_;
-            $self->finish( $id );
-            return qq|<?xml version="1.0"?>
-<!DOCTYPE cross-domain-policy SYSTEM "/xml/dtds/cross-domain-policy.dtd">
-<cross-domain-policy>
-<site-control permitted-cross-domain-policies="master-only"/>
-<allow-access-from domain="*" to-ports="*" secure="false"/>
-</cross-domain-policy>
-|;
-        });
-    }
-);
+# see script/flash-policy-server
+print "Remember, you need to also run script/flash-policy-server as root for this to work...\n";
 
 app->start;
 
