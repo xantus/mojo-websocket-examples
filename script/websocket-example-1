@@ -42,7 +42,7 @@ Mojo::Server::Daemon->new->ioloop->listen(
         my ( $self, $id ) = @_;
         warn "843 connect: $id\n";
 
-        $self->timer( $id => ( after => 5, sub {
+        $self->timer( $id => ( after => 5, cb => sub {
             $self->drop( $id );
         } ));
 
