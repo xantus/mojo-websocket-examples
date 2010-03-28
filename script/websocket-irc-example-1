@@ -1,0 +1,217 @@
+#!/usr/bin/perl
+
+# Copyright (c) 2010, David Davis - http://xant.us/
+
+# WebSocket Example 2 - irc client
+# Powered by Mojo - http://mojolicious.org/ - http://github.com/kraih/mojo
+# and web-socket-js - http://github.com/gimite/web-socket-js
+
+use FindBin;
+die "You need to run 'git submodule update --init' to fetch the example requirements\n"
+    unless -d "$FindBin::Bin/../mojo/lib";
+
+use lib "$FindBin::Bin/../mojo/lib";
+
+use Mojo::IOLoop;
+use Mojolicious::Lite;
+
+use strict;
+use warnings;
+
+# The loop
+my $loop = Mojo::IOLoop->singleton;
+
+# Connection list
+my $c = {};
+
+@ARGV = qw( daemon ) unless @ARGV;
+
+my $irc_server = 'irc.perl.org';
+my $irc_port = 6667;
+
+websocket '/' => sub {
+    my $client = shift;
+
+    app->log->debug( "client connected, connecting to $irc_server" );
+
+    $client->send_message( "Connecting to $irc_server" );
+
+    my $rand = int rand( 10000 );
+    $c->{$client}->{buffer} = "NICK tester$rand\nUSER mojo mojo-websocket 127.0.0.1 :mojo-websocket user\n";
+
+    $client->finished(sub {
+        app->log->debug( "client finished, dropping conneciton to irc server" );
+        $loop->drop( $c->{$client}->{outbound_conn} )
+            if $c->{$client}->{outbound_conn};
+
+        delete $c->{$client};
+        return;
+    });
+
+    $client->receive_message(sub {
+        $c->{$client}->{buffer} ||= '';
+        $c->{$client}->{buffer} .= $_[1]; # chunk
+
+        $loop->writing( $c->{$client}->{outbound_conn} )
+            if $c->{$client}->{outbound_conn};
+    });
+
+    my $server = $c->{$client}->{irc} = $loop->connect(
+        address => $irc_server,
+        port    => $irc_port,
+        cb      => sub {
+            app->log->debug( "Connected to $irc_server" );
+            $client->send_message( "Connected to $irc_server" );
+
+            $c->{$client}->{outbound_conn} = $_[1]; # servecr
+            $loop->writing( $_[1] ) if length $c->{$client}->{buffer};
+        }
+    );
+
+    $loop->read_cb($server => sub {
+        $client->send_message( $_[2] ); # chunk
+    });
+
+    $loop->write_cb($server => sub {
+        $loop->not_writing( $server );
+        return delete $c->{$client}->{buffer};
+    });
+
+    $loop->connection_timeout( $server => 600 );
+
+    $loop->error_cb($server => sub {
+        app->log->debug( "Disconnected from $irc_server (connection error)" );
+        $loop->drop( $client->connection );
+        delete $c->{$client};
+        return;
+    });
+
+    return;
+};
+
+get '/' => 'index';
+
+get '/favicon.ico' => sub { shift->redirect_to('http://xant.us/favicon.ico'); };
+
+# see script/flash-policy-server
+print "Chrome users: connect to 127.0.1.1 instead of localhost or 127.0.0.1\n";
+print "Remember, you need to also run script/flash-policy-server as root for this to work on non WebSocket browsers...\n";
+
+app->start;
+
+1;
+
+__DATA__
+
+@@ index.html.ep
+% my $url = $self->req->url->to_abs->scheme( 'ws' )->path( '/' );
+<!doctype html>
+<html>
+<head>
+    <title>Mojo Websocket Demo</title>
+
+    <script type="text/javascript">
+        // only load the flash fallback when needed
+        if ( !( 'WebSocket' in window ) ) {
+            document.write([
+                '<scr'+'ipt type="text/javascript" src="web-socket-js/swfobject.js"></scr'+'ipt>',
+                '<scr'+'ipt type="text/javascript" src="web-socket-js/FABridge.js"></scr'+'ipt>',
+                '<scr'+'ipt type="text/javascript" src="web-socket-js/web_socket.js"></scr'+'ipt>'
+            ].join(''));
+        }
+    </script>
+    <script type="text/javascript">
+        if ( WebSocket.__initialize ) {
+            // Set URL of your WebSocketMain.swf here:
+            WebSocket.__swfLocation = 'web-socket-js/WebSocketMain.swf';
+        }
+
+        // example copied from web-socket-js/sample.html
+        var ws, input, log, btn;
+        var ch = '#test';
+
+        function  wsconnect() {
+            btn.innerHTML = 'Disconnect';
+            output('websocket connecting...\n');
+            // Connect to Web Socket.
+            ws = new WebSocket( '<%= $url %>' );
+
+            // Set event handlers.
+            ws.onopen = function() {
+                output( 'websocket connected\n' );
+                ws.send( 'JOIN ' + ch +'\n' );
+                output( 'send: JOIN ' + ch + '\n' );
+            };
+            ws.onmessage = function(e) {
+                if ( e.data.match( /^PING (\S*)/i ) ) {
+                    ws.send( 'PONG ' + RegExp.$1 + '\n' );
+                    output( '*PING*PONG*\n' );
+                } else {
+                    output( e.data );
+                }
+            };
+            ws.onclose = function() {
+                btn.innerHTML = 'Connect';
+                output( 'websocket disconnected\n' );
+            };
+        }
+
+        function onSubmit() {
+            if ( input.value == '' )
+                return;
+            if ( input.value.match( /^\/nick (.*)/i ) ) {
+                ws.send( 'nick ' + RegExp.$1 + '\n' );
+            } else if ( input.value.match( /^\/quote (.*)/i ) ) {
+                ws.send( RegExp.$1 + '\n' );
+                output( 'raw send: ' + RegExp.$1 + '\n' );
+            } else if ( input.value.match( /^\/quit(.*)/i ) ) {
+                ws.send( 'quit :' + (RegExp.$1 || 'Shagadelic') + '\n' );
+            } else if ( input.value.match( /^\/join (.*)/i ) ) {
+                ws.send( 'part ' + ch + '\n' );
+                output( 'send: part ' + ch + '\n' );
+                ws.send( 'join ' + RegExp.$1 + '\n' );
+                output( 'send: join ' + RegExp.$1 + '\n' );
+                ch = RegExp.$1;
+            } else {
+                ws.send( 'privmsg ' + ch + ' :' + input.value + '\n' );
+                output( 'send: ' + input.value + '\n' );
+            }
+            input.value = '';
+            try{ input.focus(); } catch(e) { };
+        }
+
+        function onCloseClick() {
+            if ( btn.innerHTML == 'Disconnect' )
+                ws.close();
+            else
+                wsconnect();
+        }
+
+        function output(str) {
+            var escaped = str.replace( /&/, '&amp;' ).replace( /</, '&lt;' ).
+                replace( />/, '&gt;' ).replace( /"/, '&quot;' );
+            log.innerHTML = log.innerHTML + escaped;
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function init() {
+            input = document.getElementById( 'input' );
+            log = document.getElementById( 'log' );
+            btn = document.getElementById( 'btn' );
+            wsconnect();
+        }
+
+        window.onload = init;
+    </script>
+</head>
+<body>
+  <pre id="log" style="height:500px; width: 99%; overflow: auto;">
+  </pre>
+  <form onsubmit="onSubmit(); return false;">
+    <input type="text" id="input" style="width:400px">
+    <input type="submit" value="Send">
+    <button id="btn" onclick="onCloseClick(); return false;">Connect</button>
+  </form>
+</body>
+</html>
+
