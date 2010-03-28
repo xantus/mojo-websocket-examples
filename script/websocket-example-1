@@ -7,22 +7,27 @@
 # and web-socket-js - http://github.com/gimite/web-socket-js
 
 use FindBin;
+die "You need to run 'git submodule update --init' to fetch the example requirements\n"
+    unless -d "$FindBin::Bin/../mojo/lib";
+
 use lib "$FindBin::Bin/../mojo/lib";
+use strict;
+use warnings;
 
 use Mojolicious::Lite;
-use Mojo::Server::Daemon;
 
 @ARGV = qw( daemon ) unless @ARGV;
 
 websocket '/' => sub {
     my $self = shift;
     $self->send_message( 'Congratulations, your Mojo is working!' );
-    $self->receive_message(
-        sub {
-            my ( $self, $message ) = @_;
-            $self->send_message( 'echo:'.$message );
-        }
-    );
+    $self->finished( sub {
+        # put your disconnected client handling here
+    } );
+    $self->receive_message(sub {
+        my ( $self, $message ) = @_;
+        $self->send_message( 'echo:'.$message );
+    });
 };
 
 get '/' => 'index';
