@@ -9,3 +9,35 @@ To check out the code using git:
 git clone git://github.com/xantus/mojo-websocket-examples.git
 cd mojo-websocket-examples
 git submodule update --init
+
+
+Running the examples
+
+For non websocket native browsers, you need a flash policy server running
+(port 843, so it needs to run as root)
+
+sudo ./script/flash-policy-server &
+
+then you can run the examples
+
+Note, when running these examples, you shouldn't use http://localhost:3000/
+Instead use 127.0.0.1 or another ip local to your box.  Chrome will just refuse to
+connect to localhost
+
+
+Example 1 - Simple echo server
+
+./script/websocket-example-1
+
+Then open http://127.0.0.1:3000/
+
+
+Example 2 - Simple IRC Client
+
+The server proxies to irc.perl.org, and drops you in #test (you can /join #mojo if you'd like)
+
+./script/websocket-irc-example-1
+
+Then open http://127.0.0.1:3000/
+
+You might want to open multiple tabs or something to talk to yourself
