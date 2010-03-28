@@ -222,7 +222,7 @@ __DATA__
 </head>
 <body>
     <h2>Mojo WebSocket Demo - Simple IRC Client</h2>
-    <pre id="log" style="height:500px; width: 99%; overflow: auto;"></pre>
+    <pre id="log" style="height:400px; width: 99%; overflow: auto;"></pre>
     <form onsubmit="onSubmit(); return false;">
         <input type="text" id="input" style="width:400px">
         <input type="submit" value="Send">
