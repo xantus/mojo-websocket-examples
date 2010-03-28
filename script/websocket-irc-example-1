@@ -17,6 +17,7 @@ use Mojolicious::Lite;
 
 use strict;
 use warnings;
+use bytes;
 
 # The loop
 my $loop = Mojo::IOLoop->singleton;
@@ -53,7 +54,7 @@ websocket '/' => sub {
         $c->{$client}->{buffer} .= $_[1]; # chunk
 
         $loop->writing( $c->{$client}->{outbound_conn} )
-            if $c->{$client}->{outbound_conn};
+            if $c->{$client}->{outbound_conn} && length $c->{$client}->{buffer};
     });
 
     my $server = $c->{$client}->{irc} = $loop->connect(
@@ -115,7 +116,7 @@ __DATA__
 <!doctype html>
 <html>
 <head>
-    <title>Mojo Websocket Demo</title>
+    <title>Mojo Websocket Demo - Simple IRC Client</title>
 
     <script type="text/javascript">
         // only load the flash fallback when needed
@@ -133,17 +134,16 @@ __DATA__
             WebSocket.__swfLocation = 'web-socket-js/WebSocketMain.swf';
         }
 
-        // example copied from web-socket-js/sample.html
-        var ws, input, log, btn;
+        // example derived from web-socket-js/sample.html
+        var ws, input, log, btn, timer;
         var ch = '#test';
 
         function  wsconnect() {
             btn.innerHTML = 'Disconnect';
-            output('websocket connecting...\n');
-            // Connect to Web Socket.
+            output( 'websocket connecting...\n' );
+
             ws = new WebSocket( '<%= $url %>' );
 
-            // Set event handlers.
             ws.onopen = function() {
                 output( 'websocket connected\n' );
                 ws.send( 'JOIN ' + ch +'\n' );
@@ -161,6 +161,15 @@ __DATA__
                 btn.innerHTML = 'Connect';
                 output( 'websocket disconnected\n' );
             };
+            if ( timer )
+                clearTimeout( timer );
+            timer = setInterval( ping, 100000 );
+        }
+
+        function ping() {
+            // just to keep the websocket alive
+            if ( ws && ws.readyState == WebSocket.OPEN )
+                ws.send( '' );
         }
 
         function onSubmit() {
@@ -212,13 +221,13 @@ __DATA__
     </script>
 </head>
 <body>
-  <pre id="log" style="height:500px; width: 99%; overflow: auto;">
-  </pre>
-  <form onsubmit="onSubmit(); return false;">
-    <input type="text" id="input" style="width:400px">
-    <input type="submit" value="Send">
-    <button id="btn" onclick="onCloseClick(); return false;">Connect</button>
-  </form>
+    <h2>Mojo WebSocket Demo - Simple IRC Client</h2>
+    <pre id="log" style="height:500px; width: 99%; overflow: auto;"></pre>
+    <form onsubmit="onSubmit(); return false;">
+        <input type="text" id="input" style="width:400px">
+        <input type="submit" value="Send">
+        <button id="btn" onclick="onCloseClick(); return false;">Connect</button>
+    </form>
 </body>
 </html>
 
