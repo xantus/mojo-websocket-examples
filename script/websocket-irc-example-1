@@ -81,14 +81,14 @@ websocket '/' => sub {
 
     $loop->error_cb($server => sub {
         app->log->debug( "Disconnected from $irc_server (connection error)" );
-        $loop->drop( $client->connection );
+        $loop->drop( $client->tx->connection );
         delete $c->{$client};
         return;
     });
 
     $loop->hup_cb($server => sub {
         app->log->debug( "Disconnected from $irc_server (hangup)" );
-        $loop->drop( $client->connection );
+        $loop->drop( $client->tx->connection );
         delete $c->{$client};
         return;
     });
