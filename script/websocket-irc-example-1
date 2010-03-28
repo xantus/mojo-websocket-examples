@@ -204,8 +204,8 @@ __DATA__
         }
 
         function output(str) {
-            var escaped = str.replace( /&/, '&amp;' ).replace( /</, '&lt;' ).
-                replace( />/, '&gt;' ).replace( /"/, '&quot;' );
+            var escaped = str.replace( /&/, '&amp;', 'g' ).replace( /</, '&lt;', 'g' ).
+                replace( />/, '&gt;', 'g' ).replace( /"/, '&quot;', 'g' );
             log.innerHTML = log.innerHTML + escaped;
             log.scrollTop = log.scrollHeight;
         }
