@@ -49,19 +49,30 @@ __DATA__
 <html>
 <head>
     <title>Mojo Websocket Demo</title>
-    <script type="text/javascript" src="swfobject.js"></script>
-    <script type="text/javascript" src="FABridge.js"></script>
-    <script type="text/javascript" src="web_socket.js"></script>
+
     <script type="text/javascript">
+        // only load the flash fallback when needed
+        if ( !( 'WebSocket' in window ) ) {
+            document.write([
+                '<scr'+'ipt type="text/javascript" src="web-socket-js/swfobject.js"></scr'+'ipt>',
+                '<scr'+'ipt type="text/javascript" src="web-socket-js/FABridge.js"></scr'+'ipt>',
+                '<scr'+'ipt type="text/javascript" src="web-socket-js/web_socket.js"></scr'+'ipt>'
+            ].join(''));
+        }
+    </script>
+    <script type="text/javascript">
+        if ( WebSocket.__initialize ) {
+            // Set URL of your WebSocketMain.swf here:
+            WebSocket.__swfLocation = 'web-socket-js/WebSocketMain.swf';
+        }
 
-        // Set URL of your WebSocketMain.swf here:
-        WebSocket.__swfLocation = 'WebSocketMain.swf';
-
+        // example copied from web-socket-js/sample.html
         var ws, input, log;
 
         function init() {
             input = document.getElementById( 'input' );
             log = document.getElementById( 'log' );
+            output('connecting...');
 
             // Connect to Web Socket.
             ws = new WebSocket( '<%= $url %>' );
@@ -104,7 +115,7 @@ __DATA__
   <form onsubmit="onSubmit(); return false;">
     <input type="text" id="input">
     <input type="submit" value="Send">
-    <button onclick="onCloseClick(); return false;">disconnect</button>
+    <button onclick="onCloseClick(); return false;">Disconnect</button>
   </form>
   <div id="log"></div>
 </body>
