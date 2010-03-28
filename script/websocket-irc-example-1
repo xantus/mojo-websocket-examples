@@ -86,6 +86,13 @@ websocket '/' => sub {
         return;
     });
 
+    $loop->hup_cb($server => sub {
+        app->log->debug( "Disconnected from $irc_server (hangup)" );
+        $loop->drop( $client->connection );
+        delete $c->{$client};
+        return;
+    });
+
     return;
 };
 
