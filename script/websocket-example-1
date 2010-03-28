@@ -20,9 +20,11 @@ use Mojolicious::Lite;
 
 websocket '/' => sub {
     my $self = shift;
+    warn "client connected\n";
     $self->send_message( 'Congratulations, your Mojo is working!' );
     $self->finished( sub {
         # put your disconnected client handling here
+        warn "client disconnected\n";
     } );
     $self->receive_message(sub {
         my ( $self, $message ) = @_;
