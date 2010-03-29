@@ -7,7 +7,7 @@ use warnings;
 
 # Use bundled libraries
 use FindBin;
-use lib "$FindBin::Bin/../lib";
+use lib "$FindBin::Bin/../mojo/lib";
 
 # After all this time, somebody else with one eye... who ISN'T a clumsy
 # carpenter or a kid with a BB gun.
