@@ -44,7 +44,7 @@ app->start;
 __DATA__
 
 @@ index.html.ep
-% my $url = $self->req->url->to_abs->scheme( $self->req->is_secure ? : 'wss' : 'ws' )->path( '/' );
+% my $url = $self->req->url->to_abs->scheme( $self->req->is_secure ? 'wss' : 'ws' )->path( '/' );
 <!doctype html>
 <html>
 <head>
