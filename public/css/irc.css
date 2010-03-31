@@ -1,0 +1,24 @@
+.irc-icon {
+    background-image: url(irc16x16.png) !important;
+    background-color:transparent;
+    background-position:center center;
+    background-repeat:no-repeat;
+}
+
+.irc-user-norm {
+    background-image:url(user.png) !important;
+}
+
+.irc-user-op {
+    background-image:url(user_suit.png) !important;
+}
+
+.irc-user-halfop {
+    background-image:url(user_gray.png) !important;
+}
+
+.irc-user-voice {
+    background-image:url(user_green.png) !important;
+}
+
+
