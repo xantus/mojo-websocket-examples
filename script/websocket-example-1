@@ -22,11 +22,11 @@ websocket '/' => sub {
     my $self = shift;
     warn "client connected\n";
     $self->send_message( 'Congratulations, your Mojo is working!' );
-    $self->finished( sub {
+    $self->on_finish( sub {
         # put your disconnected client handling here
         warn "client disconnected\n";
     } );
-    $self->receive_message(sub {
+    $self->on_message(sub {
         my ( $self, $message ) = @_;
         $self->send_message( 'echo:'.$message );
     });

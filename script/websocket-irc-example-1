@@ -38,61 +38,53 @@ websocket '/' => sub {
     $client->send_message( "Connecting to $irc_server" );
 
     my $rand = int rand( 10000 );
-    $c->{$client}->{buffer} = "NICK tester$rand\nUSER mojo mojo-websocket 127.0.0.1 :mojo-websocket user\n";
 
-    $client->finished(sub {
+    my $con = $c->{"$client"} = {
+        buffer => "NICK tester$rand\nUSER mojo mojo-websocket 127.0.0.1 :mojo-websocket user\n"
+    };
+
+    $client->on_finish(sub {
         app->log->debug( "client finished, dropping conneciton to irc server" );
-        $loop->drop( $c->{$client}->{outbound_conn} )
-            if $c->{$client}->{outbound_conn};
+        $loop->drop( $con->{irc} )
+            if $con->{irc};
 
-        delete $c->{$client};
+        delete $c->{"$client"};
         return;
     });
 
-    $client->receive_message(sub {
-        $c->{$client}->{buffer} ||= '';
-        $c->{$client}->{buffer} .= $_[1]; # chunk
+    $client->on_message(sub {
+        $con->{buffer} ||= '';
+        $con->{buffer} .= $_[1]; # chunk
 
-        $loop->writing( $c->{$client}->{outbound_conn} )
-            if $c->{$client}->{outbound_conn} && length $c->{$client}->{buffer};
+        $loop->write( $con->{irc} => delete $con->{buffer} )
+            if $con->{irc} && length $con->{buffer};
     });
 
-    my $server = $c->{$client}->{irc} = $loop->connect(
+    $con->{_irc} = $loop->connect(
         address => $irc_server,
         port    => $irc_port,
-        cb      => sub {
+        on_connect => sub {
             app->log->debug( "Connected to $irc_server" );
             $client->send_message( "Connected to $irc_server" );
 
-            $c->{$client}->{outbound_conn} = $_[1]; # servecr
-            $loop->writing( $_[1] ) if length $c->{$client}->{buffer};
+            $con->{irc} = delete $con->{_irc};
+            $loop->write( $con->{irc} => delete $con->{buffer} )
+                if length $con->{buffer};
+        },
+        on_read => sub {
+            $client->send_message( $_[2] ); # chunk
+        },
+        on_error => sub {
+            app->log->debug( "Disconnected from $irc_server (connection error)" );
+            $loop->drop( $client->tx->connection );
+        },
+        on_close => sub {
+            app->log->debug( "Disconnected from $irc_server (hangup)" );
+            $loop->drop( $client->tx->connection );
         }
     );
 
-    $loop->read_cb($server => sub {
-        $client->send_message( $_[2] ); # chunk
-    });
-
-    $loop->write_cb($server => sub {
-        $loop->not_writing( $server );
-        return delete $c->{$client}->{buffer};
-    });
-
-    $loop->connection_timeout( $server => 600 );
-
-    $loop->error_cb($server => sub {
-        app->log->debug( "Disconnected from $irc_server (connection error)" );
-        $loop->drop( $client->tx->connection );
-        delete $c->{$client};
-        return;
-    });
-
-    $loop->hup_cb($server => sub {
-        app->log->debug( "Disconnected from $irc_server (hangup)" );
-        $loop->drop( $client->tx->connection );
-        delete $c->{$client};
-        return;
-    });
+    $loop->connection_timeout( $con->{_irc} => 600 );
 
     return;
 };
