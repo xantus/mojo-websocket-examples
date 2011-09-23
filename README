@@ -1,8 +1,7 @@
 
 In this repo you will find various examples using WebSockets and Mojolicious
 
-http://mojolicious.org/
-http://websockets.org/
+http://mojolicio.us/
 
 To check out the code using git:
 
@@ -22,7 +21,7 @@ then you can run the examples
 
 Note, when running these examples, you shouldn't use http://localhost:3000/
 Instead use 127.0.0.1 or another ip local to your box.  Chrome will just refuse to
-connect to localhost
+connect to localhost (or used to?)
 
 
 Example 1 - Simple echo server
