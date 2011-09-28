@@ -89,8 +89,6 @@ websocket '/' => sub {
 
 get '/' => 'index';
 
-get '/favicon.ico' => sub { shift->redirect_to('http://xant.us/favicon.ico'); };
-
 # see script/flash-policy-server
 print "Chrome users: connect to 127.0.0.1 instead of localhost\n";
 print "Remember, you need to also run script/flash-policy-server as root for this to work on non WebSocket browsers...\n";
